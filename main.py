@@ -20,15 +20,24 @@ client = genai.Client(api_key=API_KEY)
 user_states = {}
 
 
-def ai_response(user_message):
+def ai_response(user_message, user_state):
         
-    result = client.models.generate_content(
-        model="gemini-3.6-flash",
-        contents=f"""For the following message, generate an intelligent, clear,
-        natural, and well-rewritten response while preserving the original meaning.
+    
+    if user_state == "rewrite":
+            prompt = """generate an intelligent, clear,
+        natural, and well-rewritten response while preserving the original meaning."""
+    elif user_state == "summarize":
+            prompt = "generate a concise summary of the message."
+    elif user_state == "translate":
+            prompt = "translate the message into the specified language."
+    else:
+         raise ValueError("Invalid user state")
 
-        Message: {user_message}
-"""
+    result = client.models.generate_content(
+            model="gemini-3.6-flash",
+            contents=f"""For the following message:
+            {prompt}
+            Message: {user_message}"""
     )
     return result.text
 
@@ -51,7 +60,15 @@ async def handle_message(update, context):
     if user_state == "rewrite":
         print(user_state)
 
-        response = ai_response(user_message)
+        try:
+            response = ai_response(user_message, user_state)
+        except ValueError as e:
+            await update.message.reply_text("Invalid user state. Please use /rewrite commands first.")
+            return
+        except Exception as e:
+            print(e)
+            await update.message.reply_text("Something went wrong. Please try again.")
+            return
         del user_states[user_id]
         await update.message.reply_text(response)
     else:
@@ -62,7 +79,7 @@ def main():
 
     application.add_handler(CommandHandler("start", start))
 
-    application.add_handler(CommandHandler("rewrite", rewrite))
+    application.add_handler(CommandHandler("rewrite", rewrite))  
 
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
